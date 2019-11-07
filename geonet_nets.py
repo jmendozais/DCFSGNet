@@ -91,9 +91,16 @@ def vs_net(opt, posenet_inputs, dispnet_inputs):
             conv2_dn = resblock(pool1_dn,      64, 3) # H/8  -  256D
             conv3_dn = resblock(conv2_dn,     128, 4) # H/16 -  512D
             conv4_dn = resblock(conv3_dn,     256, 6) # H/32 - 1024D
-            dconv4_dn = tf.layers.dropout(conv4_dn, rate=0.2, training=is_training)
-            conv5_dn = resblock(dconv4_dn,     512, 3) # H/64 - 2048D
+            # No DO
+            # conv5_dn = resblock(conv4_dn,     512, 3) # H/64 - 2048D
+            # DO 1
+            conv5_dn = resblock(conv4_dn,     512, 3) # H/64 - 2048D
             conv5_dn = tf.layers.dropout(conv5_dn, rate=0.2, training=is_training)
+            # DO 3 and 4
+            #dconv4_dn = tf.layers.dropout(conv4_dn, rate=0.2, training=is_training)
+            #conv5_dn = resblock(dconv4_dn,     512, 3) # H/64 - 2048D
+            #conv5_dn = tf.layers.dropout(conv5_dn, rate=0.2, training=is_training)
+ 
 
             skip1 = conv1_dn
             skip2 = pool1_dn
@@ -106,13 +113,13 @@ def vs_net(opt, posenet_inputs, dispnet_inputs):
             upconv6 = resize_like(upconv6, skip5)
             concat6 = tf.concat([upconv6, skip5], 3)
             iconv6  = conv(concat6,   512, 3, 1)
-            iconv6 = tf.layers.dropout(iconv6, rate=0.2, training=is_training)
+            #iconv6 = tf.layers.dropout(iconv6, rate=0.2, training=is_training)
 
             upconv5 = upconv(iconv6, 256, 3, 2) #H/16
             upconv5 = resize_like(upconv5, skip4)
             concat5 = tf.concat([upconv5, skip4], 3)
             iconv5  = conv(concat5,   256, 3, 1)
-            iconv5 = tf.layers.dropout(iconv5, rate=0.2, training=is_training)
+            #iconv5 = tf.layers.dropout(iconv5, rate=0.2, training=is_training)
 
             upconv4 = upconv(iconv5,  128, 3, 2) #H/8
             upconv4 = resize_like(upconv4, skip3)

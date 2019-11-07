@@ -2,7 +2,8 @@
 pip install joblib
 
 # VARIABLES
-kitti_raw="/home/juliomb/datasets/kitti/raw_data/"
+#kitti_raw="/home/juliomb/datasets/kitti/raw_data/"
+kitti_raw="/data/KITTI/raw_data/"
 kitti_odometry="/home/juliomb/datasets/kitti/dataset_odometry_color/"
 kitti_sflow_multiview="/home/juliomb/datasets/kitti/data_scene_flow_multiview/"
 kitti_sflow="/home/juliomb/datasets/kitti/data_scene_flow/"
@@ -61,15 +62,17 @@ evaluate_depth() {
 
     for ckp in "${ckps[@]}"
     do
-        model_file="${model_name}/model-${ckp}000"
-        pred_dir="${model_name}/depth/${ckp}k/"
+        #model_file="${model_name}/model-${ckp}000"
+        #pred_dir="${model_name}/depth/${ckp}k/"
+        model_file="/data/ra153646/tflogs/${model_name}/model-${ckp}000"
+        pred_dir="/data/ra153646/tflogs/${model_name}/depth/${ckp}k/"
         echo "########### $model_file - depth ###########"
         echo python geonet_main.py --mode=test_depth --dataset_dir=${kitti_raw} --init_ckpt_file=${model_file} --batch_size=1 --depth_test_split=eigen --output_dir=${pred_dir} ${ext_args}
         python geonet_main.py --mode=test_depth --dataset_dir=${kitti_raw} --init_ckpt_file=${model_file} --batch_size=1 --depth_test_split=eigen --output_dir=${pred_dir} ${ext_args}
     done
 
-    results_dir="${model_name}/depth/"
-    echo "call $model_name $start $end">>${results_dir}depth_log.txt
+    #results_dir="${model_name}/depth/"
+    results_dir="/data/ra153646/tflogs/${model_name}/depth/"
     for ckp in "${ckps[@]}"
     do
         pred_dir="${results_dir}${ckp}k/"
@@ -129,7 +132,11 @@ evaluate_depth() {
 #evaluate_depth "coupled_dc0.31_train" 10 450 10 450
 #evaluate_depth "coupled_dc0.31_train_complete" 5 300 5 300
 #evaluate_depth "coupled_dc0.31_lr0.0001_train_complete" 5 320 5 320
-evaluate_depth "co_dc0.31_a2l_k3_train" 200 480 5 480
+#evaluate_depth "co_dc0.31_a2l_k3_train" 200 480 5 480
+#evaluate_depth "fcsimp_dc0.31_train" 5 180 5 180
+#evaluate_depth "fcsimp_dc0.31_train" 305 305 5 305
+#evaluate_depth "fcsimp_dc_nodo_0.31__train" 5 500 5 500
+evaluate_depth "fcsimp_dc_do1_0.31__train" 5 500 5 500
 
 #model_file="geonet_seq3/model-325000"
 #pred_dir="geonet_seq3/pose-325k-s10/"

@@ -65,6 +65,7 @@ flags.DEFINE_string("tag",                 "untagged",    "Tag to save tensorboa
 
 ##### Parameter selection ###### 
 flags.DEFINE_boolean("model_selection",          False,    "Run the script in model selection mode")
+flags.DEFINE_boolean("log",          False,    "Run the script in model selection mode")
 
 opt = flags.FLAGS
 
