@@ -4,7 +4,7 @@ This repository implements the paper [Self-Supervised Depth Estimation Based on 
 
 # Acknowledgements
 
-This repository is built on [GeoNet](https://github.com/yzcjtr/GeoNet). We thank the authors for their sharing their work. 
+This repository is built on [GeoNet](https://github.com/yzcjtr/GeoNet). We thank the authors for their sharing their great work. 
 
 # Citing 
 
