@@ -24,7 +24,8 @@ def convert_disps_to_depths_stereo(gt_disparities, pred_depths):
     gt_depths = []
     pred_depths_resized = []
     pred_disparities_resized = []
-    
+
+    errors = []
     for i in range(len(gt_disparities)):
         gt_disp = gt_disparities[i]
         height, width = gt_disp.shape

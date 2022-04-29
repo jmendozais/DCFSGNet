@@ -136,7 +136,8 @@ evaluate_depth() {
 #evaluate_depth "fcsimp_dc0.31_train" 5 180 5 180
 #evaluate_depth "fcsimp_dc0.31_train" 305 305 5 305
 #evaluate_depth "fcsimp_dc_nodo_0.31__train" 5 500 5 500
-evaluate_depth "fcsimp_dc_do1_0.31__train" 5 500 5 500
+#evaluate_depth "fcsimp_dc_do1_0.31__train" 5 500 5 500
+evaluate_depth "fcsimp_dc_do3_0.31__train" 5 500 5 500
 
 #model_file="geonet_seq3/model-325000"
 #pred_dir="geonet_seq3/pose-325k-s10/"

@@ -1,0 +1,9 @@
+kitti_depth_3_rmstatic
+kitti_pose_5_rmstatic
+pose_gt_9_snpts_s5
+pose_gt_10_snpts_s5
+.vscode
+
+__pycache__
+*/__pycache__
+*/*/__pycache__

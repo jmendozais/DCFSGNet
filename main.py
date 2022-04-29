@@ -7,10 +7,10 @@ import numpy as np
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
 
-from geonet_model import *
-from geonet_test_depth import *
-from geonet_test_pose import *
-from geonet_test_flow import *
+from model import *
+from test_depth import *
+from test_pose import *
+from test_flow import *
 from data_loader import DataLoader
 
 flags = tf.app.flags
@@ -31,7 +31,7 @@ flags.DEFINE_integer("max_steps",               300000,    "Maximum number of tr
 flags.DEFINE_integer("save_ckpt_freq",            5000,    "Save the checkpoint model every save_ckpt_freq iterations")
 flags.DEFINE_float("alpha_recon_image",           0.85,    "Alpha weight between SSIM and L1 in reconstruction loss")
 
-##### Configurations about DepthNet & PoseNet of GeoNet #####
+##### Configurations about DepthNet & PoseNet #####
 flags.DEFINE_string("dispnet_encoder",      "resnet50",    "Type of encoder for dispnet, vgg or resnet50")
 flags.DEFINE_boolean("scale_normalize",          False,    "Spatially normalize depth prediction")
 flags.DEFINE_float("rigid_warp_weight",            1.0,    "Weight for warping by rigid flow")
@@ -40,7 +40,7 @@ flags.DEFINE_float("consistency_weight",      0.2,    "Weight for bidirectional 
 flags.DEFINE_float("consistency_thold",      0.3,    "Threshold for bidirectional rigid 2d flow consistency")
 flags.DEFINE_float("soft_occ_alpha",      0.5,    "Threshold for bidirectional rigid 2d flow consistency")
 
-##### Configurations about ResFlowNet of GeoNet (or DirFlowNetS) #####
+##### Configurations about ResFlowNet #####
 flags.DEFINE_string("flownet_type",         "residual",    "type of flownet, residual or direct")
 flags.DEFINE_float("flow_warp_weight",             1.0,    "Weight for warping by full flow")
 flags.DEFINE_float("flow_smooth_weight",           0.2,    "Weight for flow smoothness")
@@ -88,7 +88,7 @@ def train():
         tgt_image, src_image_stack, intrinsics = loader.load_train_batch()
 
         # Build Model
-        model = GeoNetModel(opt, tgt_image, src_image_stack, intrinsics)
+        model = Model(opt, tgt_image, src_image_stack, intrinsics)
         loss = model.total_loss
         tf.summary.scalar("total loss", loss)
         
@@ -102,12 +102,11 @@ def train():
 
         # Train Op
         if opt.mode == 'train_flow' and opt.flownet_type == "residual":
-            # we pretrain DepthNet & PoseNet, then finetune ResFlowNetS
             train_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "flow_net")
             vars_to_restore = slim.get_variables_to_restore(include=["depth_net", "pose_net"])
         else:
             train_vars = [var for var in tf.trainable_variables()]
-            vars_to_restore = slim.get_model_variables()
+            vars_to_restore = slim.get_model_variables()I
         
         vars_to_restore += [global_step]
         print("Trainable variables")
@@ -119,8 +118,6 @@ def train():
             print(var.name)
 
         if opt.init_ckpt_file != None:
-            #from tensorflow.python.tools.inspect_checkpoint import print_tensors_in_checkpoint_file
-            #print_tensors_in_checkpoint_file(opt.init_ckpt_file, all_tensors=False, all_tensor_names=True, tensor_name='')
             init_assign_op, init_feed_dict = slim.assign_from_checkpoint(
                                             opt.init_ckpt_file, vars_to_restore)
 

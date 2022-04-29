@@ -5,6 +5,7 @@ import math
 import numpy as np
 import os
 
+
 def compute_ate(gtruth_file, pred_file):
     gtruth_list = read_file_list(gtruth_file)
     pred_list = read_file_list(pred_file)
@@ -12,144 +13,177 @@ def compute_ate(gtruth_file, pred_file):
     if len(matches) < 2:
         return False
 
-    gtruth_xyz = np.array([[float(value) for value in gtruth_list[a][0:3]] for a,b in matches])
-    pred_xyz = np.array([[float(value) for value in pred_list[b][0:3]] for a,b in matches])
-    
+    gtruth_xyz = np.array(
+        [[float(value) for value in gtruth_list[a][0:3]] for a, b in matches]
+    )
+    pred_xyz = np.array(
+        [[float(value) for value in pred_list[b][0:3]] for a, b in matches]
+    )
+
     # Make sure that the first matched frames align (no need for rotational alignment as
     # all the predicted/ground-truth snippets have been converted to use the same coordinate
     # system with the first frame of the snippet being the origin).
     offset = gtruth_xyz[0] - pred_xyz[0]
-    pred_xyz += offset[None,:]
+    pred_xyz += offset[None, :]
 
     # Optimize the scaling factor
-    scale = np.sum(gtruth_xyz * pred_xyz)/np.sum(pred_xyz ** 2)
+    scale = np.sum(gtruth_xyz * pred_xyz) / np.sum(pred_xyz**2)
     alignment_error = pred_xyz * scale - gtruth_xyz
-    rmse = np.sqrt(np.sum(alignment_error ** 2))/len(matches)
+    rmse = np.sqrt(np.sum(alignment_error**2)) / len(matches)
     return rmse
 
+
 def load_poses(pose_dir, length=None, time=True):
-  poses_tum = []
-  times = []
-  files = os.listdir(pose_dir)
-  files = sorted(files)
-  if length == None:
-    length = len(files)
-    
-  for i in range(length):
-    if files[i].split('.')[-1] != 'txt':
-      continue
-    f = open(pose_dir + files[i])
-    pose_seq = []
-    times_seq = []
-    for line in f.readlines():
-      pose = [float(x) for x in line.split(" ")]
-      times_seq.append(pose[0])
-      xyz = pose[1:4]
-      rot = quat2mat([pose[7]] + pose[4:7])
-      pose = np.concatenate([rot, np.array([xyz]).transpose()], axis=1)
-      pose = np.concatenate([pose, [[0,0,0,1]]])
-      pose_seq.append(pose)
-    pose_seq = np.array(pose_seq)
-    times.append(times_seq) 
-    poses_tum.append(pose_seq)
-    
-  poses_tum = np.array(poses_tum)
-  times = np.array(times)
-  return times, poses_tum
+    poses_tum = []
+    times = []
+    files = os.listdir(pose_dir)
+    files = sorted(files)
+    if length == None:
+        length = len(files)
+
+    for i in range(length):
+        if files[i].split(".")[-1] != "txt":
+            continue
+        f = open(pose_dir + files[i])
+        pose_seq = []
+        times_seq = []
+        for line in f.readlines():
+            pose = [float(x) for x in line.split(" ")]
+            times_seq.append(pose[0])
+            xyz = pose[1:4]
+            rot = quat2mat([pose[7]] + pose[4:7])
+            pose = np.concatenate([rot, np.array([xyz]).transpose()], axis=1)
+            pose = np.concatenate([pose, [[0, 0, 0, 1]]])
+            pose_seq.append(pose)
+        pose_seq = np.array(pose_seq)
+        times.append(times_seq)
+        poses_tum.append(pose_seq)
+
+    poses_tum = np.array(poses_tum)
+    times = np.array(times)
+    return times, poses_tum
+
 
 def tum2mat(poses_tum, first=1):
-  abs_poses = [poses_tum[0][0]]
-  rel_poses = [poses_tum[0][0]]
-  for i in range(1, len(poses_tum)):
-    rel = np.dot(np.linalg.inv(poses_tum[i-1][first]), poses_tum[i-1][first+1])
-    abs_poses.append(np.dot(abs_poses[i-1], rel))
-    rel_poses.append(rel)
-  abs_poses = np.array(abs_poses)
-  rel_poses = np.array(rel_poses)
-  return abs_poses, rel_poses
+    abs_poses = [poses_tum[0][0]]
+    rel_poses = [poses_tum[0][0]]
+    for i in range(1, len(poses_tum)):
+        rel = np.dot(
+            np.linalg.inv(poses_tum[i - 1][first]), poses_tum[i - 1][first + 1]
+        )
+        abs_poses.append(np.dot(abs_poses[i - 1], rel))
+        rel_poses.append(rel)
+    abs_poses = np.array(abs_poses)
+    rel_poses = np.array(rel_poses)
+    return abs_poses, rel_poses
+
 
 def last_frame(poses, dist, first, limit):
-  for i in range(first, len(poses)):
-    if dist[i] - dist[first] > limit:
-      return i
-  return -1
+    for i in range(first, len(poses)):
+        if dist[i] - dist[first] > limit:
+            return i
+    return -1
+
 
 def sample_errors_by_seq_len(apose_gt, apose_pred, limits, dist, step=10):
-  errors = []
-  for i in range(len(limits)):
-    for first in range(0, len(dist), step):
-      last = last_frame(apose_gt, dist, first, limits[i])
-      if last == -1:
-        continue
+    errors = []
+    for i in range(len(limits)):
+        for first in range(0, len(dist), step):
+            last = last_frame(apose_gt, dist, first, limits[i])
+            if last == -1:
+                continue
 
-      # x_i -> x_j
-      delta_gt = np.dot(np.linalg.inv(apose_gt[first]), apose_gt[last])
-      delta_pred = np.dot(np.linalg.inv(apose_pred[first]), apose_pred[last])
+            # x_i -> x_j
+            delta_gt = np.dot(np.linalg.inv(apose_gt[first]), apose_gt[last])
+            delta_pred = np.dot(np.linalg.inv(apose_pred[first]), apose_pred[last])
 
-      # gt -> pred
-      error = np.dot(np.linalg.inv(delta_gt), delta_pred)
-      error_t =  np.dot(apose_gt[first][:3,:3],(-1 * delta_gt[:3,3] + delta_pred[:3,3]))
+            # gt -> pred
+            error = np.dot(np.linalg.inv(delta_gt), delta_pred)
+            error_t = np.dot(
+                apose_gt[first][:3, :3], (-1 * delta_gt[:3, 3] + delta_pred[:3, 3])
+            )
 
-      tre = np.linalg.norm(error[:3, 3])
-      rote = math.acos((error[0,0] + error[1,1] + error[2,2] - 1.0)/2)
-      seq_len = dist[last] - dist[first]
+            tre = np.linalg.norm(error[:3, 3])
+            rote = math.acos((error[0, 0] + error[1, 1] + error[2, 2] - 1.0) / 2)
+            seq_len = dist[last] - dist[first]
 
-      speed = seq_len/((last - first + 1)*0.1)
-      errors.append([limits[i], speed, tre/seq_len, rote/seq_len, first, last, 180*rote/math.pi, error_t[0], error_t[2]])
-  return np.array(errors)
+            speed = seq_len / ((last - first + 1) * 0.1)
+            errors.append(
+                [
+                    limits[i],
+                    speed,
+                    tre / seq_len,
+                    rote / seq_len,
+                    first,
+                    last,
+                    180 * rote / math.pi,
+                    error_t[0],
+                    error_t[2],
+                ]
+            )
+    return np.array(errors)
+
 
 def eval_odometry_kitti(gt_dir, pred_dir, limits=None):
     if limits is None:
-    	limits = (np.arange(8) + 1) * 100
+        limits = (np.arange(8) + 1) * 100
 
     gt_times_tum, gt_tum = load_poses(gt_dir)
     pred_times_tum, pred_tum = load_poses(pred_dir)
     seq_len = len(gt_tum[0])
 
-    assert(len(gt_tum[0]) == len(pred_tum[0]))
+    assert len(gt_tum[0]) == len(pred_tum[0])
 
-    #apose_gt, rpose_gt = tum2mat(gt_tum, seq_len//2 - 1)
-    #apose_pred, rpose_pred = tum2mat(pred_tum, seq_len//2 - 1)
+    # apose_gt, rpose_gt = tum2mat(gt_tum, seq_len//2 - 1)
+    # apose_pred, rpose_pred = tum2mat(pred_tum, seq_len//2 - 1)
     apose_gt, rpose_gt = tum2mat(gt_tum, 0)
     apose_pred, rpose_pred = tum2mat(pred_tum, 0)
     dist = np.zeros(shape=(len(gt_tum),))
     for i in range(1, len(gt_tum)):
-          dist[i] = dist[i-1] + np.linalg.norm(rpose_gt[i][:3, 3])
+        dist[i] = dist[i - 1] + np.linalg.norm(rpose_gt[i][:3, 3])
     # Scale factor values is different but better, then the resulting error should be slighly lower
-    scale_factor_pred = np.sum(np.linalg.norm(rpose_gt[:,:3,3]))/np.sum(np.linalg.norm(rpose_pred[:,:3,3]))
-    apose_pred[:,:3,3] *= scale_factor_pred
-    rpose_pred[:,:3,3] *= scale_factor_pred
+    scale_factor_pred = np.sum(np.linalg.norm(rpose_gt[:, :3, 3])) / np.sum(
+        np.linalg.norm(rpose_pred[:, :3, 3])
+    )
+    apose_pred[:, :3, 3] *= scale_factor_pred
+    rpose_pred[:, :3, 3] *= scale_factor_pred
 
     errors = sample_errors_by_seq_len(apose_gt, apose_pred, limits, dist, step=10)
-    return errors[:,2], errors[:,3]
+    return errors[:, 2], errors[:, 3]
+
 
 def read_file_list(filename):
     """
-    Reads a trajectory from a text file. 
-    
+    Reads a trajectory from a text file.
+
     File format:
     The file format is "stamp d1 d2 d3 ...", where stamp denotes the time stamp (to be matched)
-    and "d1 d2 d3.." is arbitary data (e.g., a 3D position and 3D orientation) associated to this timestamp. 
-    
+    and "d1 d2 d3.." is arbitary data (e.g., a 3D position and 3D orientation) associated to this timestamp.
+
     Input:
     filename -- File name
-    
+
     Output:
     dict -- dictionary of (stamp,data) tuples
-    
+
     """
     file = open(filename)
     data = file.read()
-    lines = data.replace(","," ").replace("\t"," ").split("\n") 
-    list = [[v.strip() for v in line.split(" ") if v.strip()!=""] for line in lines if len(line)>0 and line[0]!="#"]
-    list = [(float(l[0]),l[1:]) for l in list if len(l)>1]
+    lines = data.replace(",", " ").replace("\t", " ").split("\n")
+    list = [
+        [v.strip() for v in line.split(" ") if v.strip() != ""]
+        for line in lines
+        if len(line) > 0 and line[0] != "#"
+    ]
+    list = [(float(l[0]), l[1:]) for l in list if len(l) > 1]
     return dict(list)
 
-def associate(first_list, second_list,offset,max_difference):
+
+def associate(first_list, second_list, offset, max_difference):
     """
-    Associate two dictionaries of (stamp,data). As the time stamps never match exactly, we aim 
+    Associate two dictionaries of (stamp,data). As the time stamps never match exactly, we aim
     to find the closest match for every input tuple.
-    
+
     Input:
     first_list -- first dictionary of (stamp,data) tuples
     second_list -- second dictionary of (stamp,data) tuples
@@ -158,14 +192,16 @@ def associate(first_list, second_list,offset,max_difference):
 
     Output:
     matches -- list of matched tuples ((stamp1,data1),(stamp2,data2))
-    
+
     """
     first_keys = list(first_list.keys())
     second_keys = list(second_list.keys())
-    potential_matches = [(abs(a - (b + offset)), a, b) 
-                         for a in first_keys 
-                         for b in second_keys 
-                         if abs(a - (b + offset)) < max_difference]
+    potential_matches = [
+        (abs(a - (b + offset)), a, b)
+        for a in first_keys
+        for b in second_keys
+        if abs(a - (b + offset)) < max_difference
+    ]
     potential_matches.sort()
     matches = []
     for diff, a, b in potential_matches:
@@ -173,17 +209,19 @@ def associate(first_list, second_list,offset,max_difference):
             first_keys.remove(a)
             second_keys.remove(b)
             matches.append((a, b))
-    
+
     matches.sort()
     return matches
+
 
 def rot2quat(R):
     rz, ry, rx = mat2euler(R)
     qw, qx, qy, qz = euler2quat(rz, ry, rx)
     return qw, qx, qy, qz
 
+
 def quat2mat(q):
-    ''' Calculate rotation matrix corresponding to quaternion
+    """Calculate rotation matrix corresponding to quaternion
     https://afni.nimh.nih.gov/pub/dist/src/pkundu/meica.libs/nibabel/quaternions.py
     Parameters
     ----------
@@ -214,25 +252,35 @@ def quat2mat(q):
     >>> M = quat2mat([0, 1, 0, 0]) # 180 degree rotn around axis 0
     >>> np.allclose(M, np.diag([1, -1, -1]))
     True
-    '''
+    """
     w, x, y, z = q
-    Nq = w*w + x*x + y*y + z*z
+    Nq = w * w + x * x + y * y + z * z
     if Nq < 1e-8:
         return np.eye(3)
-    s = 2.0/Nq
-    X = x*s
-    Y = y*s
-    Z = z*s
-    wX = w*X; wY = w*Y; wZ = w*Z
-    xX = x*X; xY = x*Y; xZ = x*Z
-    yY = y*Y; yZ = y*Z; zZ = z*Z
+    s = 2.0 / Nq
+    X = x * s
+    Y = y * s
+    Z = z * s
+    wX = w * X
+    wY = w * Y
+    wZ = w * Z
+    xX = x * X
+    xY = x * Y
+    xZ = x * Z
+    yY = y * Y
+    yZ = y * Z
+    zZ = z * Z
     return np.array(
-           [[ 1.0-(yY+zZ), xY-wZ, xZ+wY ],
-            [ xY+wZ, 1.0-(xX+zZ), yZ-wX ],
-            [ xZ-wY, yZ+wX, 1.0-(xX+yY) ]])
+        [
+            [1.0 - (yY + zZ), xY - wZ, xZ + wY],
+            [xY + wZ, 1.0 - (xX + zZ), yZ - wX],
+            [xZ - wY, yZ + wX, 1.0 - (xX + yY)],
+        ]
+    )
 
-def mat2euler(M, cy_thresh=None, seq='zyx'):
-    '''
+
+def mat2euler(M, cy_thresh=None, seq="zyx"):
+    """
     Taken From: http://afni.nimh.nih.gov/pub/dist/src/pkundu/meica.libs/nibabel/eulerangles.py
     Discover Euler angle vector from 3x3 matrix
     Uses the conventions above.
@@ -275,7 +323,7 @@ def mat2euler(M, cy_thresh=None, seq='zyx'):
     See: http://www.graphicsgems.org/
     The code appears to be licensed (from the website) as "can be used
     without restrictions".
-    '''
+    """
     M = np.asarray(M)
     if cy_thresh is None:
         try:
@@ -284,18 +332,18 @@ def mat2euler(M, cy_thresh=None, seq='zyx'):
             cy_thresh = _FLOAT_EPS_4
     r11, r12, r13, r21, r22, r23, r31, r32, r33 = M.flat
     # cy: sqrt((cos(y)*cos(z))**2 + (cos(x)*cos(y))**2)
-    cy = math.sqrt(r33*r33 + r23*r23)
-    if seq=='zyx':
-        if cy > cy_thresh: # cos(y) not close to zero, standard form
-            z = math.atan2(-r12,  r11) # atan2(cos(y)*sin(z), cos(y)*cos(z))
-            y = math.atan2(r13,  cy) # atan2(sin(y), cy)
-            x = math.atan2(-r23, r33) # atan2(cos(y)*sin(x), cos(x)*cos(y))
-        else: # cos(y) (close to) zero, so x -> 0.0 (see above)
+    cy = math.sqrt(r33 * r33 + r23 * r23)
+    if seq == "zyx":
+        if cy > cy_thresh:  # cos(y) not close to zero, standard form
+            z = math.atan2(-r12, r11)  # atan2(cos(y)*sin(z), cos(y)*cos(z))
+            y = math.atan2(r13, cy)  # atan2(sin(y), cy)
+            x = math.atan2(-r23, r33)  # atan2(cos(y)*sin(x), cos(x)*cos(y))
+        else:  # cos(y) (close to) zero, so x -> 0.0 (see above)
             # so r21 -> sin(z), r22 -> cos(z) and
-            z = math.atan2(r21,  r22)
-            y = math.atan2(r13,  cy) # atan2(sin(y), cy)
+            z = math.atan2(r21, r22)
+            y = math.atan2(r13, cy)  # atan2(sin(y), cy)
             x = 0.0
-    elif seq=='xyz':
+    elif seq == "xyz":
         if cy > cy_thresh:
             y = math.atan2(-r31, cy)
             x = math.atan2(r32, r33)
@@ -303,17 +351,20 @@ def mat2euler(M, cy_thresh=None, seq='zyx'):
         else:
             z = 0.0
             if r31 < 0:
-                y = np.pi/2
+                y = np.pi / 2
                 x = atan2(r12, r13)
             else:
-                y = -np.pi/2
+                y = -np.pi / 2
     else:
-        raise Exception('Sequence not recognized')
+        raise Exception("Sequence not recognized")
     return z, y, x
 
+
 import functools
+
+
 def euler2mat(z=0, y=0, x=0, isRadian=True):
-    ''' Return matrix for rotations around z, y and x axes
+    """Return matrix for rotations around z, y and x axes
     Uses the z, then y, then x convention above
     Parameters
     ----------
@@ -371,44 +422,36 @@ def euler2mat(z=0, y=0, x=0, isRadian=True):
     curl your fingers; the direction your fingers curl is the direction
     of rotation).  Therefore, the rotations are counterclockwise if
     looking along the axis of rotation from positive to negative.
-    '''
+    """
 
     if not isRadian:
-        z = ((np.pi)/180.) * z
-        y = ((np.pi)/180.) * y
-        x = ((np.pi)/180.) * x
-    assert z>=(-np.pi) and z < np.pi, 'Inapprorpriate z: %f' % z
-    assert y>=(-np.pi) and y < np.pi, 'Inapprorpriate y: %f' % y
-    assert x>=(-np.pi) and x < np.pi, 'Inapprorpriate x: %f' % x    
+        z = ((np.pi) / 180.0) * z
+        y = ((np.pi) / 180.0) * y
+        x = ((np.pi) / 180.0) * x
+    assert z >= (-np.pi) and z < np.pi, "Inapprorpriate z: %f" % z
+    assert y >= (-np.pi) and y < np.pi, "Inapprorpriate y: %f" % y
+    assert x >= (-np.pi) and x < np.pi, "Inapprorpriate x: %f" % x
 
     Ms = []
     if z:
-            cosz = math.cos(z)
-            sinz = math.sin(z)
-            Ms.append(np.array(
-                            [[cosz, -sinz, 0],
-                             [sinz, cosz, 0],
-                             [0, 0, 1]]))
+        cosz = math.cos(z)
+        sinz = math.sin(z)
+        Ms.append(np.array([[cosz, -sinz, 0], [sinz, cosz, 0], [0, 0, 1]]))
     if y:
-            cosy = math.cos(y)
-            siny = math.sin(y)
-            Ms.append(np.array(
-                            [[cosy, 0, siny],
-                             [0, 1, 0],
-                             [-siny, 0, cosy]]))
+        cosy = math.cos(y)
+        siny = math.sin(y)
+        Ms.append(np.array([[cosy, 0, siny], [0, 1, 0], [-siny, 0, cosy]]))
     if x:
-            cosx = math.cos(x)
-            sinx = math.sin(x)
-            Ms.append(np.array(
-                            [[1, 0, 0],
-                             [0, cosx, -sinx],
-                             [0, sinx, cosx]]))
+        cosx = math.cos(x)
+        sinx = math.sin(x)
+        Ms.append(np.array([[1, 0, 0], [0, cosx, -sinx], [0, sinx, cosx]]))
     if Ms:
-            return functools.reduce(np.dot, Ms[::-1])
+        return functools.reduce(np.dot, Ms[::-1])
     return np.eye(3)
 
+
 def euler2quat(z=0, y=0, x=0, isRadian=True):
-    ''' Return quaternion corresponding to these Euler angles
+    """Return quaternion corresponding to these Euler angles
     Uses the z, then y, then x convention above
     Parameters
     ----------
@@ -433,42 +476,47 @@ def euler2quat(z=0, y=0, x=0, isRadian=True):
     3. Apply quaternion multiplication formula -
          http://en.wikipedia.org/wiki/Quaternions#Hamilton_product - to
          formulae from 2.) to give formula for combined rotations.
-    '''
-  
+    """
+
     if not isRadian:
-        z = ((np.pi)/180.) * z
-        y = ((np.pi)/180.) * y
-        x = ((np.pi)/180.) * x
-    z = z/2.0
-    y = y/2.0
-    x = x/2.0
+        z = ((np.pi) / 180.0) * z
+        y = ((np.pi) / 180.0) * y
+        x = ((np.pi) / 180.0) * x
+    z = z / 2.0
+    y = y / 2.0
+    x = x / 2.0
     cz = math.cos(z)
     sz = math.sin(z)
     cy = math.cos(y)
     sy = math.sin(y)
     cx = math.cos(x)
     sx = math.sin(x)
-    return np.array([
-                     cx*cy*cz - sx*sy*sz,
-                     cx*sy*sz + cy*cz*sx,
-                     cx*cz*sy - sx*cy*sz,
-                     cx*cy*sz + sx*cz*sy])
+    return np.array(
+        [
+            cx * cy * cz - sx * sy * sz,
+            cx * sy * sz + cy * cz * sx,
+            cx * cz * sy - sx * cy * sz,
+            cx * cy * sz + sx * cz * sy,
+        ]
+    )
+
 
 def pose_vec_to_mat(vec):
     tx = vec[0]
     ty = vec[1]
     tz = vec[2]
-    trans = np.array([tx, ty, tz]).reshape((3,1))
+    trans = np.array([tx, ty, tz]).reshape((3, 1))
     rot = euler2mat(vec[5], vec[4], vec[3])
     Tmat = np.concatenate((rot, trans), axis=1)
-    hfiller = np.array([0, 0, 0, 1]).reshape((1,4))
+    hfiller = np.array([0, 0, 0, 1]).reshape((1, 4))
     Tmat = np.concatenate((Tmat, hfiller), axis=0)
     return Tmat
+
 
 def dump_pose_seq_TUM(out_file, poses, times):
     # First frame as the origin
     first_pose = pose_vec_to_mat(poses[0])
-    with open(out_file, 'w') as f:
+    with open(out_file, "w") as f:
         for p in range(len(times)):
             this_pose = pose_vec_to_mat(poses[p])
             # this_pose = np.dot(this_pose, np.linalg.inv(first_pose))
@@ -478,4 +526,6 @@ def dump_pose_seq_TUM(out_file, poses, times):
             tz = this_pose[2, 3]
             rot = this_pose[:3, :3]
             qw, qx, qy, qz = rot2quat(rot)
-            f.write('%f %f %f %f %f %f %f %f\n' % (times[p], tx, ty, tz, qx, qy, qz, qw))
+            f.write(
+                "%f %f %f %f %f %f %f %f\n" % (times[p], tx, ty, tz, qx, qy, qz, qw)
+            )
